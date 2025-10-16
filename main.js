@@ -1,5 +1,8 @@
 import http from "http";
 import { Command } from "commander";
+import fs from "fs";
+import { XMLBuilder } from "fast-xml-parser";
+import url from "url";
 
 const program = new Command();
 
@@ -13,16 +16,55 @@ program.parse(process.argv);
 const { input, host, port } = program.opts();
 
 //перевірка наявності файлу
-import fs from "fs";
 if (!fs.existsSync(input)) {
   console.error("Cannot find input file");
   process.exit(1);
 }
 
-//створення http-сервера
+//читання даних з JSON
+function readData(filePath) {
+    const content = fs.readFileSync(filePath, "utf8");
+    const lines = content.split(/\r?\n/).filter((line) => line.trim() !== "");
+    return lines.map((line) => JSON.parse(line));
+}
+
+//http сервер
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("HTTP server is running correctly");
+  const query = url.parse(req.url, true).query;
+  const data = readData(input);
+
+  let filtered = data;
+
+  //?furnished=true
+  if (query.furnished === "true") {
+    filtered = filtered.filter(
+      (item) => item.furnishingstatus?.toLowerCase() === "furnished"
+    );
+  }
+
+  //?max_price=X
+  if (query.max_price) {
+    const maxPrice = parseFloat(query.max_price);
+    filtered = filtered.filter(
+      (item) => parseFloat(item.price) < maxPrice
+    );
+  }
+
+  //формування XML
+  const builder = new XMLBuilder({ ignoreAttributes: false });
+  const xmlObj = {
+    houses: {
+      house: filtered.map((item) => ({
+        price: item.price,
+        area: item.area,
+        furnishingstatus: item.furnishingstatus,
+      })),
+    },
+  };
+  const xmlData = builder.build(xmlObj);
+
+  res.writeHead(200, { "Content-Type": "application/xml" });
+  res.end(xmlData);
 });
 
 server.listen(port, host, () => {
