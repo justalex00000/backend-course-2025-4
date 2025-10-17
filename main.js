@@ -22,16 +22,16 @@ if (!fs.existsSync(input)) {
 }
 
 //читання даних з JSON
-function readData(filePath) {
-    const content = fs.readFileSync(filePath, "utf8");
-    const lines = content.split(/\r?\n/).filter((line) => line.trim() !== "");
-    return lines.map((line) => JSON.parse(line));
+async function readData(filePath) {
+  const content = await fs.promises.readFile(filePath, "utf8");
+  const lines = content.split(/\r?\n/).filter(line => line.trim() !== "");
+  return lines.map(line => JSON.parse(line));
 }
 
 //http сервер
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const query = url.parse(req.url, true).query;
-  const data = readData(input);
+  const data = await readData(input);
 
   let filtered = data;
 
